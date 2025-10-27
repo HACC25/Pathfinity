@@ -8,11 +8,7 @@ import {
   UserCircleIcon,
 } from "lucide-react"
 
-<<<<<<<< HEAD:app/ui/nav-user.tsx
-import { Avatar, AvatarFallback, AvatarImage } from "./avatar"
-========
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
->>>>>>>> main:src/components/sidebar/nav-user.tsx
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,21 +17,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-<<<<<<<< HEAD:app/ui/nav-user.tsx
-} from "./dropdown-menu"
-========
 } from "../ui/dropdown-menu"
->>>>>>>> main:src/components/sidebar/nav-user.tsx
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-<<<<<<<< HEAD:app/ui/nav-user.tsx
-} from "./sidebar"
-========
 } from "../ui/sidebar"
->>>>>>>> main:src/components/sidebar/nav-user.tsx
 
 export function NavUser({
   user,
