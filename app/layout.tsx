@@ -31,7 +31,7 @@ export default function RootLayout({
       >
         <SidebarProvider>
           <ChatSidebar />
-          <main>
+          <main className="flex-1 overflow-hidden">
             {children}
           </main>
         </SidebarProvider>
