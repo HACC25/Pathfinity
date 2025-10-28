@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
-import { Github, Mail } from 'lucide-react';
+import { Github } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
@@ -13,10 +13,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isGithubLoading, setIsGithubLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
 
     try {
       const result = await authClient.signIn.email({
@@ -24,40 +28,53 @@ export default function LoginPage() {
         password,
       });
 
-      if (!result.success) {
-        // Handle error
-        console.error('Authentication failed:', result.error);
-      } else {
-        // Redirect to dashboard on success
+      if (!result.error) {
         router.push('/dashboard');
+        router.refresh();
+      } else {
+        setError(result.error.message || 'Authentication failed');
       }
     } catch (error) {
       console.error('Sign in error:', error);
+      setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    setError('');
+    
     try {
+      // Better Auth handles the OAuth flow automatically
+      // It will redirect to Google, then back to your callback URL
       await authClient.signIn.social({
         provider: 'google',
-        callbackURL: '/dashboard'
+        callbackURL: '/Roadmap', // Where to redirect after successful auth
       });
     } catch (error) {
       console.error('Google sign in error:', error);
+      setError('Failed to sign in with Google');
+      setIsGoogleLoading(false);
     }
   };
 
   const handleGithubSignIn = async () => {
+    setIsGithubLoading(true);
+    setError('');
+    
     try {
+      // Better Auth handles the OAuth flow automatically
+      // It will redirect to GitHub, then back to your callback URL
       await authClient.signIn.social({
         provider: 'github',
-        callbackURL: '/dashboard'
+        callbackURL: '/Roadmap', // Where to redirect after successful auth
       });
-      router.push('/dashboard');
     } catch (error) {
       console.error('Github sign in error:', error);
+      setError('Failed to sign in with GitHub');
+      setIsGithubLoading(false);
     }
   };
 
@@ -72,6 +89,12 @@ export default function LoginPage() {
             Sign in to your account
           </p>
         </div>
+
+        {error && (
+          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleEmailSignIn} className="mt-8 space-y-6">
           <div className="space-y-4 rounded-md">
@@ -125,29 +148,54 @@ export default function LoginPage() {
               type="button"
               variant="outline"
               onClick={handleGoogleSignIn}
+              disabled={isGoogleLoading || isGithubLoading}
               className="w-full"
             >
-              <Image
-                src="/google.svg"
-                alt="Google"
-                width={20}
-                height={20}
-                className="mr-2"
-              />
-              Google
+              {isGoogleLoading ? (
+                <span className="mr-2">Loading...</span>
+              ) : (
+                <>
+                  <Image
+                    src="/google.svg"
+                    alt="Google"
+                    width={20}
+                    height={20}
+                    className="mr-2"
+                  />
+                  Google
+                </>
+              )}
             </Button>
             
             <Button
               type="button"
               variant="outline"
               onClick={handleGithubSignIn}
+              disabled={isGoogleLoading || isGithubLoading}
               className="w-full"
             >
-              <Github className="mr-2 h-5 w-5" />
-              GitHub
+              {isGithubLoading ? (
+                <span className="mr-2">Loading...</span>
+              ) : (
+                <>
+                  <Github className="mr-2 h-5 w-5" />
+                  GitHub
+                </>
+              )}
             </Button>
           </div>
         </form>
+
+        <div className="text-center text-sm">
+          <span className="text-muted-foreground">Don't have an account? </span>
+          <Button
+            variant="link"
+            className="p-0 h-auto font-semibold"
+            onClick={() => router.push('/signup')}
+          >
+            Sign up
+          </Button>
+        </div>
       </div>
     </div>
   );
