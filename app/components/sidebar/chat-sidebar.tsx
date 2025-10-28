@@ -25,32 +25,32 @@ const data = {
     navMain: [
         {
             title: "Home",
-            url: "#",
+            url: "/",
             icon: Home,
         },
         {
             title: "Roadmap",
-            url: "#",
+            url: "/Roadmap",
             icon: Map,
         },
         {
             title: "Profiles",
-            url: "#",
+            url: "/Profiles",
             icon: SquareUser,
         },
         {
             title: "Majors",
-            url: "#",
+            url: "/Majors",
             icon: GraduationCap,
         },
         {
             title: "Careers",
-            url: "#",
+            url: "/Careers",
             icon: Briefcase,
         },
         {
             title: "People",
-            url: "#",
+            url: "/People",
             icon: User,
         }
     ],
@@ -67,7 +67,7 @@ export function ChatSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) 
                 asChild
                 className="data-[slot=sidebar-menu-button]:!p-1.5"
               >
-                <a href="#">
+                <a href="/">
                   <Infinity className="h-5 w-5" />
                   <span className="text-base font-semibold">Pathfinity</span>
                 </a>
