@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { Infinity, Home, Map, SquareUser, GraduationCap, Briefcase, User } from "lucide-react"
+import { useSession } from "@/lib/auth-client"
 
 import { NavMain } from "./nav-main"
 import { NavUser } from "./nav-user"
@@ -56,7 +57,12 @@ const data = {
     ],
 }
 
+
+
 export function ChatSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+    const { data: session, isPending } = useSession()
+    const user = session?.user || null
+
     return (
         <>
         <Sidebar collapsible="icon" {...props}>
@@ -79,7 +85,7 @@ export function ChatSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) 
           <NavMain items={data.navMain} />
         </SidebarContent>
         <SidebarFooter>
-          <NavUser user={data.user} />
+          <NavUser user={user} />
         </SidebarFooter>
       </Sidebar>
       <SidebarTrigger className="position-fixed top-0 p-2" />
