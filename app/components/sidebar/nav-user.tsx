@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
-import { Button } from "../ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,32 +43,9 @@ export function NavUser({
     await authClient.signOut()
     router.push('/')
   }
-
-  // Show login/signup buttons if user is not signed in
-  if (!user) {
-    return (
-      <SidebarMenu>
-        <SidebarMenuItem>
-          <div className="flex flex-col gap-2 px-2 py-2">
-            <Button 
-              onClick={() => router.push('/login')}
-              className="w-full"
-              variant="default"
-            >
-              Log in
-            </Button>
-            <Button 
-              onClick={() => router.push('/signup')}
-              className="w-full"
-              variant="outline"
-            >
-              Sign up
-            </Button>
-          </div>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    )
-  }
+  // If user is not signed in, don't render login/signup buttons in the sidebar.
+  // The landing page handles authentication flows, so return null here.
+  if (!user) return null
 
   // Show user menu if signed in
   return (

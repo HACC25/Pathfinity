@@ -26,7 +26,7 @@ export default async function Home() {
           <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-gray-900">
             Log in
           </Link>
-          <Link href="/signup" className="ml-2 inline-flex items-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
+          <Link href="/login" className="ml-2 inline-flex items-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
             Sign up
           </Link>
         </nav>
