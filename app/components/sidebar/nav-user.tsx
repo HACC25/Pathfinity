@@ -42,7 +42,7 @@ export function NavUser({
 
   const handleLogout = async () => {
     await authClient.signOut()
-    router.push('/login')
+    router.push('/')
   }
 
   // Show login/signup buttons if user is not signed in
