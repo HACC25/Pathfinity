@@ -1,36 +1,128 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pathfinity
 
-## Getting Started
+Pathfinity is a Next.js application with advanced authentication features including automatic account linking between OAuth and email/password authentication.
 
-First, run the development server:
+## 🚀 Features
 
+- **Multiple Authentication Methods**: Email/password, GitHub OAuth, Google OAuth
+- **Automatic Account Linking**: Seamlessly links OAuth accounts to existing email accounts
+- **Dual Authentication**: OAuth users can also use email/password login
+- **Secure Password Generation**: Auto-generated passwords for OAuth users
+- **Profile Management**: Users can change passwords and manage account settings
+- **Modern UI**: Built with shadcn/ui components and Tailwind CSS
+
+## 🔐 Authentication Features
+
+### Account Linking
+- **Automatic**: No manual linking required
+- **Bi-directional**: Works for OAuth→Email and Email→OAuth flows  
+- **Secure**: Maintains data integrity and user sessions
+- **Seamless**: Single account per email address
+
+### Supported Providers
+- ✅ Email/Password authentication
+- ✅ GitHub OAuth
+- ✅ Google OAuth
+- ✅ Automatic password generation for OAuth users
+
+## 📖 Documentation
+
+- [`AUTH_SETUP.md`](AUTH_SETUP.md) - Initial authentication setup guide
+- [`EMAIL_AUTH_README.md`](EMAIL_AUTH_README.md) - Email authentication details
+- [`ACCOUNT_LINKING_README.md`](ACCOUNT_LINKING_README.md) - Account linking implementation guide
+
+## 🛠️ Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- PostgreSQL database (Neon recommended)
+- GitHub OAuth app
+- Google OAuth app
+
+### Environment Setup
+
+1. Copy environment variables:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Configure your `.env.local`:
+```bash
+# Database
+DATABASE_URL=your_postgresql_url
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# Authentication
+BETTER_AUTH_SECRET=your_secret_key
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# OAuth Providers
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+```
 
-## Learn More
+### Installation
 
-To learn more about Next.js, take a look at the following resources:
+1. Install dependencies:
+```bash
+npm install
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. Push database schema:
+```bash
+npx drizzle-kit push
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. Start development server:
+```bash
+npm run dev
+```
 
-## Deploy on Vercel
+4. Open [http://localhost:3000](http://localhost:3000)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🧪 Testing Account Linking
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Visit `/test-account-linking` for a comprehensive testing guide, or try these scenarios:
+
+1. **Link OAuth to Email Account**:
+   - Create account with email/password
+   - Sign in with GitHub/Google using same email
+   - Both authentication methods now work
+
+2. **Use OAuth-Generated Password**:
+   - Sign in with GitHub/Google
+   - Visit `/profile` to see auto-generated password
+   - Sign out and use email/password login
+
+## 📁 Project Structure
+
+```
+├── app/                    # Next.js app directory
+│   ├── (with-sidebar)/    # Sidebar layout pages
+│   ├── api/auth/          # Authentication API routes
+│   ├── components/        # React components
+│   ├── login/             # Login page
+│   └── profile/           # Profile management
+├── lib/                   # Core authentication logic
+├── src/db/               # Database schema and connection
+├── hooks/                # Custom React hooks
+└── types/                # TypeScript type definitions
+```
+
+## 🔧 Tech Stack
+
+- **Framework**: Next.js 14 with App Router
+- **Authentication**: Better Auth
+- **Database**: PostgreSQL with Drizzle ORM
+- **Styling**: Tailwind CSS + shadcn/ui
+- **TypeScript**: Full type safety
+- **Deployment**: Vercel-ready
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read the documentation files for implementation details.
+
+## 📄 License
+
+[MIT License](LICENSE)

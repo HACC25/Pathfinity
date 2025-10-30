@@ -42,10 +42,10 @@ export default async function Home() {
           </p>
 
           <div className="flex justify-center gap-4">
-            <Link href="/signup" className="inline-flex items-center px-6 py-3 rounded-md bg-indigo-600 text-white font-semibold hover:bg-indigo-700">
+            <Link href="/login" className="inline-flex items-center px-6 py-3 rounded-md bg-indigo-600 text-white font-semibold hover:bg-indigo-700">
               Get started
             </Link>
-            <Link href="/dashboard" className="inline-flex items-center px-6 py-3 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            <Link href="/" className="inline-flex items-center px-6 py-3 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
               Learn more
             </Link>
           </div>

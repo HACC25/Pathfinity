@@ -46,26 +46,82 @@ export const auth = betterAuth({
   events: {
     user: {
       created: async (user: { id: string; email: string; password?: string }) => {
-        // Check if this user was created via OAuth (has no password)
+        // Only run for OAuth users (no password) and when email exists
         if (!user.password && user.email) {
           try {
-            // Generate a secure random password for OAuth users
+            // Check if another user with this email already exists
+            const existingUser = await db.query.user.findFirst({
+              where: eq(schema.user.email, user.email),
+              columns: { id: true, email: true, password: true, name: true, image: true, emailVerified: true }
+            });
+
+            // If we found another user with the same email (not the one just created)
+            if (existingUser && existingUser.id !== user.id) {
+              console.log(`Found existing user with email ${user.email}. Linking accounts...`);
+              
+              // Move the account from the new user to the existing user
+              await db.update(schema.account)
+                .set({ userId: existingUser.id })
+                .where(eq(schema.account.userId, user.id));
+
+              // Move any sessions from the new user to the existing user
+              await db.update(schema.session)
+                .set({ userId: existingUser.id })
+                .where(eq(schema.session.userId, user.id));
+
+              // Update existing user with OAuth info if missing
+              const updateData: Partial<typeof schema.user.$inferInsert> = {};
+              if (!existingUser.image && user.id) {
+                // Get the new user's image from the database
+                const newUserData = await db.query.user.findFirst({
+                  where: eq(schema.user.id, user.id),
+                  columns: { image: true }
+                });
+                if (newUserData?.image) {
+                  updateData.image = newUserData.image;
+                }
+              }
+              if (!existingUser.emailVerified) {
+                updateData.emailVerified = true;
+              }
+              
+              if (Object.keys(updateData).length > 0) {
+                await db.update(schema.user)
+                  .set(updateData)
+                  .where(eq(schema.user.id, existingUser.id));
+              }
+
+              // If existing user doesn't have a password, generate one
+              if (!existingUser.password) {
+                const randomPassword = generateSecurePassword();
+                const bcrypt = await import('bcryptjs');
+                const hashedPassword = await bcrypt.hash(randomPassword, 12);
+                
+                await db.update(schema.user)
+                  .set({ password: hashedPassword })
+                  .where(eq(schema.user.id, existingUser.id));
+              }
+
+              // Delete the duplicate user that was just created
+              await db.delete(schema.user)
+                .where(eq(schema.user.id, user.id));
+
+              console.log(`Successfully linked OAuth account to existing user: ${existingUser.email}`);
+              return; // Exit early since we've handled the linking
+            }
+
+            // If no existing user found, this is a new OAuth user - generate password
             const randomPassword = generateSecurePassword();
-            
-            // Use bcrypt to hash the password
             const bcrypt = await import('bcryptjs');
             const hashedPassword = await bcrypt.hash(randomPassword, 12);
             
-            // Update the user with the hashed password
             await db.update(schema.user)
               .set({ password: hashedPassword })
               .where(eq(schema.user.id, user.id));
             
-            console.log(`Generated password for OAuth user: ${user.email}`);
-            // Store the plain password temporarily for potential user notification
-            // In production, you might want to email this to the user or prompt them to change it
+            console.log(`Generated password for new OAuth user: ${user.email}`);
           } catch (error) {
-            console.error("Error generating password for OAuth user:", error);
+            console.error("Error handling OAuth user creation:", error);
           }
         }
       },
