@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { SidebarProvider } from "./components/ui/sidebar";
-import { ChatSidebar } from "./components/sidebar/chat-sidebar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,13 +27,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SidebarProvider>
-          <ChatSidebar />
-          <main className="flex-1 overflow-hidden">
-            {children}
-          </main>
-        </SidebarProvider>
+        {/* Root layout no longer injects the chat sidebar globally.
+            Routes that need the sidebar are placed inside the
+            `(with-sidebar)` route group which provides the SidebarProvider
+            and ChatSidebar. This keeps pages such as `/login` and `/signup`
+            free of the sidebar. */}
+        <main className="flex-1 overflow-hidden">
+          {children}
+        </main>
       </body>
     </html>
   );
 }
+
