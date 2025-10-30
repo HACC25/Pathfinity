@@ -6,6 +6,7 @@ export const user = pgTable("users", {
   email: text("email").notNull().unique(), 
   emailVerified: boolean("email_verified"),
   image: text("image"),
+  password: text("password"), // Add password field for email authentication
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
