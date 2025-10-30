@@ -11,31 +11,65 @@ import { useRouter } from 'next/navigation';
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSignup, setIsSignup] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGithubLoading, setIsGithubLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
-      const result = await authClient.signIn.email({
-        email,
-        password,
-      });
+      if (isSignup) {
+        if (!name.trim()) {
+          setError('Please enter your name');
+          setIsLoading(false);
+          return;
+        }
+        if (password.length < 6) {
+          setError('Password must be at least 6 characters long');
+          setIsLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError("Passwords don't match");
+          setIsLoading(false);
+          return;
+        }
 
-      if (!result.error) {
-        router.push('/');
-        router.refresh();
+        const result = await authClient.signUp.email({
+          email,
+          password,
+          name,
+        });
+
+        if (!result.error) {
+          router.push('/Home');
+          router.refresh();
+        } else {
+          setError(result.error.message || 'Sign up failed');
+        }
       } else {
-        setError(result.error.message || 'Authentication failed');
+        const result = await authClient.signIn.email({
+          email,
+          password,
+        });
+
+        if (!result.error) {
+          router.push('/Home');
+          router.refresh();
+        } else {
+          setError(result.error.message || 'Authentication failed');
+        }
       }
-    } catch (error) {
-      console.error('Sign in error:', error);
+    } catch (err) {
+      console.error(isSignup ? 'Sign up error:' : 'Sign in error:', err);
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
@@ -83,10 +117,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h2 className="mt-6 text-3xl font-bold tracking-tight">
-            Welcome back
+            {isSignup ? 'Create your account' : 'Welcome back'}
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Sign in to your account
+            {isSignup ? 'Sign up to start using Pathfinity' : 'Sign in to your account'}
           </p>
         </div>
 
@@ -96,8 +130,22 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleEmailSignIn} className="mt-8 space-y-6">
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <div className="space-y-4 rounded-md">
+            {isSignup && (
+              <div>
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  required
+                  placeholder="Full name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            )}
             <div>
               <Input
                 id="email"
@@ -122,6 +170,20 @@ export default function LoginPage() {
                 className="w-full"
               />
             </div>
+            {isSignup && (
+              <div>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  required
+                  placeholder="Re-type password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            )}
           </div>
 
           <Button
@@ -129,7 +191,7 @@ export default function LoginPage() {
             className="w-full"
             disabled={isLoading}
           >
-            {isLoading ? 'Signing in...' : 'Sign in with Email'}
+            {isLoading ? (isSignup ? 'Signing up...' : 'Signing in...') : (isSignup ? 'Create account' : 'Sign in with Email')}
           </Button>
 
           <div className="relative my-4">
@@ -187,14 +249,14 @@ export default function LoginPage() {
         </form>
 
         <div className="text-center text-sm">
-          <span className="text-muted-foreground">Don't have an account? </span>
-          <Button
-            variant="link"
-            className="p-0 h-auto font-semibold"
-            onClick={() => router.push('/signup')}
+          <span className="text-muted-foreground">{isSignup ? 'Already have an account? ' : "Don't have an account? "}</span>
+          <button
+            type="button"
+            className="p-0 h-auto font-semibold text-indigo-600 hover:underline"
+            onClick={() => setIsSignup((s) => !s)}
           >
-            Sign up
-          </Button>
+            {isSignup ? 'Log in' : 'Sign up'}
+          </button>
         </div>
       </div>
     </div>
