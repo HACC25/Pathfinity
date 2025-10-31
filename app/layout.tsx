@@ -27,11 +27,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Root layout no longer injects the chat sidebar globally.
-            Routes that need the sidebar are placed inside the
-            `(with-sidebar)` route group which provides the SidebarProvider
-            and ChatSidebar. This keeps pages such as `/login` and `/signup`
-            free of the sidebar. */}
         <main className="flex-1 overflow-hidden">
           {children}
         </main>
