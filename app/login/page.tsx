@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
+import { PasswordRequirements } from '@/app/components/ui/password-requirements';
+import { validatePassword } from '@/lib/utils';
 import { Github } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -19,6 +21,10 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGithubLoading, setIsGithubLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  
+  // Check if password is valid in real-time for signup
+  const isPasswordValid = !isSignup || validatePassword(password).isValid;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,11 +38,15 @@ export default function LoginPage() {
           setIsLoading(false);
           return;
         }
-        if (password.length < 6) {
-          setError('Password must be at least 6 characters long');
+        
+        // Validate password using the new requirements
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
+          setError(`Password requirements not met: ${passwordValidation.failedRequirements.map(req => req.label).join(', ')}`);
           setIsLoading(false);
           return;
         }
+        
         if (password !== confirmPassword) {
           setError("Passwords don't match");
           setIsLoading(false);
@@ -167,9 +177,14 @@ export default function LoginPage() {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setShowPasswordRequirements(true)}
+                onBlur={() => setShowPasswordRequirements(false)}
                 className="w-full"
               />
             </div>
+            {isSignup && (showPasswordRequirements || password) && (
+              <PasswordRequirements password={password} />
+            )}
             {isSignup && (
               <div>
                 <Input
@@ -189,7 +204,7 @@ export default function LoginPage() {
           <Button
             type="submit"
             className="w-full"
-            disabled={isLoading}
+            disabled={isLoading || (isSignup && !isPasswordValid)}
           >
             {isLoading ? (isSignup ? 'Signing up...' : 'Signing in...') : (isSignup ? 'Create account' : 'Sign in with Email')}
           </Button>
