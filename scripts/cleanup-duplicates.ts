@@ -1,5 +1,5 @@
-import { db } from "@/src/db";
-import * as schema from "@/src/db/schema";
+import { db } from "@/app/db";
+import * as schema from "@/app/db/schema";
 import { eq } from "drizzle-orm";
 
 /**
