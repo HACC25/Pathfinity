@@ -43,11 +43,9 @@ export function NavUser({
     await authClient.signOut()
     router.push('/')
   }
-  // If user is not signed in, don't render login/signup buttons in the sidebar.
-  // The landing page handles authentication flows, so return null here.
+
   if (!user) return null
 
-  // Show user menu if signed in
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -100,6 +98,7 @@ export function NavUser({
                 <UserCircleIcon />
                 Account
               </DropdownMenuItem>
+              {/*
               <DropdownMenuItem onClick={() => router.push('/billing')}>
                 <CreditCardIcon />
                 Billing
@@ -108,6 +107,7 @@ export function NavUser({
                 <BellIcon />
                 Notifications
               </DropdownMenuItem>
+              */}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>

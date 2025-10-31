@@ -61,7 +61,13 @@ const data = {
 
 export function ChatSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const { data: session, isPending } = useSession()
-    const user = session?.user || null
+    const user = session?.user
+        ? {
+            name: session.user.name,
+            email: session.user.email,
+            avatar: session.user.image ?? "/avatars/default.jpg",
+        }
+        : null
 
     return (
         <>
