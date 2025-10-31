@@ -22,6 +22,20 @@
       "when": 1761802553719,
       "tag": "0002_warm_toad_men",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1761919534454,
+      "tag": "0003_luxuriant_blink",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1761920465149,
+      "tag": "0004_familiar_ken_ellis",
+      "breakpoints": true
     }
   ]
 }
