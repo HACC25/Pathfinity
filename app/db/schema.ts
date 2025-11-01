@@ -1,5 +1,15 @@
-import { boolean, pgTable, text,  timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  pgTable,
+  text,
+  timestamp,
+  serial,
+  vector,
+  index,
+  jsonb,
+} from "drizzle-orm/pg-core";
 
+/* User / Auth */
 export const user = pgTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -46,3 +56,35 @@ export const verification = pgTable("verifications", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").notNull(),
 });
+
+/* RAG (Retrieval-Augmented Generation) tables */
+
+// Sources represent the origin of documents (files, URLs, datasets)
+export const source = pgTable("sources", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  url: text("url"),
+  type: text("type").notNull(), // e.g. 'json-file', 'api'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Embeddings: store only the embeddings and minimal metadata, linked to a source.
+export const embedding = pgTable("embeddings", {
+  id: serial("id").primaryKey(),
+  sourceId: text("source_id").notNull().references(() => source.id, { onDelete: "cascade" }),
+  refId: text("ref_id"),              // record ID in source (e.g., courseCode)
+  title: text("title"),               // human-readable title
+  campus: text("campus"),             // optional display info
+  courseCode: text("course_code"),    // optional for courses
+  content: text("content"),           // the text used to create embedding
+  metadata: jsonb("metadata"),        // store the full original object
+  contentHash: text("content_hash"),  // optional deduplication
+  embedding: vector("embedding", { dimensions: 1536 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("embedding_vector_idx").using("ivfflat", table.embedding.op("vector_cosine_ops")),
+  ]
+);
