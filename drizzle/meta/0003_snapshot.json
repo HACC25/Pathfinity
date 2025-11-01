@@ -6,6 +6,7 @@
   "tables": {
     "public.accounts": {
       "name": "accounts",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",

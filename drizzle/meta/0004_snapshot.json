@@ -1,5 +1,5 @@
 {
-  "id": "1cd8cfb7-4d8d-4229-b5a9-c5f7ab3d77b1",
+  "id": "6f9854f5-7b7c-4205-b35a-202dbc0febd1",
   "prevId": "8b794eb2-24a4-4a42-90a3-2209a0d23794",
   "version": "7",
   "dialect": "postgresql",
@@ -111,8 +111,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.chunks": {
-      "name": "chunks",
+    "public.embeddings": {
+      "name": "embeddings",
       "schema": "",
       "columns": {
         "id": {
@@ -121,39 +121,57 @@
           "primaryKey": true,
           "notNull": true
         },
-        "document_id": {
-          "name": "document_id",
+        "source_id": {
+          "name": "source_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "text": {
-          "name": "text",
+        "ref_id": {
+          "name": "ref_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campus": {
+          "name": "campus",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "course_code": {
+          "name": "course_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "content_hash": {
+          "name": "content_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "embedding": {
           "name": "embedding",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "embedding_vector": {
-          "name": "embedding_vector",
           "type": "vector(1536)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "token_count": {
-          "name": "token_count",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -173,11 +191,11 @@
         }
       },
       "indexes": {
-        "chunks_embedding_idx": {
-          "name": "chunks_embedding_idx",
+        "embedding_vector_idx": {
+          "name": "embedding_vector_idx",
           "columns": [
             {
-              "expression": "embedding_vector",
+              "expression": "embedding",
               "isExpression": false,
               "asc": true,
               "nulls": "last",
@@ -191,80 +209,9 @@
         }
       },
       "foreignKeys": {
-        "chunks_document_id_documents_id_fk": {
-          "name": "chunks_document_id_documents_id_fk",
-          "tableFrom": "chunks",
-          "tableTo": "documents",
-          "columnsFrom": [
-            "document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.citations": {
-      "name": "citations",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "chunk_id": {
-          "name": "chunk_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_id": {
-          "name": "source_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "citations_chunk_id_chunks_id_fk": {
-          "name": "citations_chunk_id_chunks_id_fk",
-          "tableFrom": "citations",
-          "tableTo": "chunks",
-          "columnsFrom": [
-            "chunk_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "citations_source_id_sources_id_fk": {
-          "name": "citations_source_id_sources_id_fk",
-          "tableFrom": "citations",
+        "embeddings_source_id_sources_id_fk": {
+          "name": "embeddings_source_id_sources_id_fk",
+          "tableFrom": "embeddings",
           "tableTo": "sources",
           "columnsFrom": [
             "source_id"
@@ -276,134 +223,6 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.documents": {
-      "name": "documents",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "content_hash": {
-          "name": "content_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_id": {
-          "name": "source_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "documents_source_id_sources_id_fk": {
-          "name": "documents_source_id_sources_id_fk",
-          "tableFrom": "documents",
-          "tableTo": "sources",
-          "columnsFrom": [
-            "source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.rag_indexes": {
-      "name": "rag_indexes",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "config": {
-          "name": "config",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -521,7 +340,7 @@
           "name": "type",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",

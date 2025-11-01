@@ -1,117 +1,267 @@
-#!/usr/bin/env node
-import path from "path";
-import fs from "fs";
-import { db } from "../../app/db/index";
-import { source as SourceTable, document as DocumentTable, chunk as ChunkTable } from "../../app/db/schema";
-import { listJsonFiles, loadJsonFile, makeId, chunkText, estimateTokens, contentHash } from "./utils";
-import { eq } from "drizzle-orm";
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
+import * as fs from 'fs/promises';
+import * as crypto from 'crypto';
+import dotenv from 'dotenv';
+import OpenAI from 'openai';
+import { source, embedding } from '../../app/db/schema';
+import { eq, and, or } from 'drizzle-orm';
 
-async function upsertSource(name: string, type = "json-file", url?: string) {
-  // try to find existing source by name to avoid duplicates
-  const existing = await db.select().from(SourceTable).where(eq(SourceTable.name, name)).limit(1);
-  if (existing.length) return existing[0].id;
+// Load .env for local testing
+dotenv.config();
 
-  const id = makeId();
-  await db.insert(SourceTable).values({ id, name, type, url: url ?? null, createdAt: new Date(), updatedAt: new Date() });
-  return id;
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Initialize Neon database
+const sql = neon(process.env.DATABASE_URL!);
+const db = drizzle(sql);
+
+interface CourseData {
+  course_prefix: string;
+  course_number: string;
+  course_title: string;
+  course_desc: string;
+  num_units: string;
+  dept_name: string;
+  inst_ipeds: number;
+  metadata: string;
 }
 
-function renderDocumentContent(item: any): { title: string; content: string } {
-  // Try common fields first (courses, programs, jobs, skills)
-  const parts: string[] = [];
-  let title = item.title || item.course_title || item.program_name || item.name || item.job_title || item.title || "Document";
-
-  if (item.course_prefix && item.course_number && item.course_title) {
-    title = `${item.course_prefix} ${item.course_number} — ${item.course_title}`;
-  }
-
-  // collect textual fields
-  const textFields = ["description", "course_desc", "program_desc", "metadata", "content", "summary", "job_description", "notes"];
-  for (const field of textFields) {
-    if (item[field]) parts.push(String(item[field]));
-  }
-
-  // fall back to stringify the object (useful when fields are unknown)
-  if (parts.length === 0) parts.push(JSON.stringify(item, null, 2));
-
-  const content = parts.join("\n\n");
-  return { title, content };
+/*
+ * Generate a content hash for deduplication
+ */
+function generateContentHash(content: string): string {
+  return crypto.createHash('sha256').update(content).digest('hex');
 }
 
-async function ingestFile(filePath: string) {
-  console.log(`Ingesting ${filePath}`);
-  const baseName = path.basename(filePath);
-  const data = loadJsonFile(filePath);
-  const srcId = await upsertSource(baseName, "json-file");
+/**
+ * Generate a stable source ID based on file name
+ */
+function generateSourceId(fileName: string): string {
+  const hash = crypto.createHash('sha256').update(fileName).digest('hex').slice(0, 8);
+  const safe = fileName.replace(/\W+/g, '_').replace(/^_+|_+$/g, '').toLowerCase();
+  return `source_${safe}_${hash}`;
+}
 
-  const items = Array.isArray(data) ? data : [data];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    const docId = makeId();
-    const { title, content } = renderDocumentContent(item);
+/**
+ * Create embedding content from course data
+ */
+function createEmbeddingContent(course: CourseData): string {
+  const courseCode = `${course.course_prefix} ${course.course_number}`;
+  return `Course: ${courseCode} - ${course.course_title}
+Department: ${course.dept_name}
+Units: ${course.num_units}
+Description: ${course.course_desc}
+Additional Info: ${course.metadata}`;
+}
 
-    // idempotency: skip if document with same content hash already exists
-    const hash = contentHash(content);
-  const existingDoc = await db.select().from(DocumentTable).where(eq(DocumentTable.contentHash, hash)).limit(1);
-    if (existingDoc.length) {
-      console.log(`  -> document already exists (skipping) id=${existingDoc[0].id}`);
+/**
+ * Generate embeddings using OpenAI with batch support
+ */
+async function generateEmbeddings(texts: string[]): Promise<number[][]> {
+  const response = await openai.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: texts,
+  });
+  return response.data.map(item => item.embedding as number[]);
+}
+
+// Note: per-item existence checks were removed in favor of a single IN-query per batch below.
+
+/**
+ * Process courses in batches with API-level batching
+ */
+async function processBatch(
+  courses: CourseData[],
+  sourceId: string,
+  batchSize: number = 20,
+  skipExisting: boolean = true
+): Promise<{ processed: number; skipped: number }> {
+  let totalProcessed = 0;
+  let totalSkipped = 0;
+
+  for (let i = 0; i < courses.length; i += batchSize) {
+    const batch = courses.slice(i, i + batchSize);
+
+    const batchData = batch.map(course => {
+      const courseCode = `${course.course_prefix} ${course.course_number}`;
+      const content = createEmbeddingContent(course);
+      const contentHash = generateContentHash(content);
+
+      return {
+        course,
+        courseCode,
+        content,
+        contentHash,
+      };
+    });
+
+    // Filter out existing embeddings if skipExisting is true using a single IN-query per batch
+    let toProcess = batchData.slice();
+    if (skipExisting) {
+      const hashes = batchData.map(d => d.contentHash);
+      let existingRows: { contentHash: string | null }[] = [];
+      if (hashes.length > 0) {
+        // Build a dynamic OR clause for the content_hash IN (...) behavior
+        const contentConditions = hashes.map(h => eq(embedding.contentHash, h));
+        existingRows = await db
+          .select({ contentHash: embedding.contentHash })
+          .from(embedding)
+          .where(and(eq(embedding.sourceId, sourceId), or(...contentConditions)));
+      }
+
+      const existingSet = new Set(existingRows.filter(r => r.contentHash != null).map(r => r.contentHash as string));
+      toProcess = batchData.filter(d => !existingSet.has(d.contentHash));
+    }
+
+    const skipped = batch.length - toProcess.length;
+    totalSkipped += skipped;
+
+    if (toProcess.length === 0) {
+      console.log(`Batch ${Math.floor(i / batchSize) + 1}: All ${batch.length} courses already exist, skipping`);
       continue;
     }
 
-    await db.insert(DocumentTable).values({
-      id: docId,
-      title,
-      content,
-      metadata: JSON.stringify(item),
-      contentHash: hash,
-      sourceId: srcId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    // chunk and insert
-    const chunks = chunkText(content, 1200, 200);
-    for (const txt of chunks) {
-      await db.insert(ChunkTable).values({
-        documentId: docId,
-        text: txt,
-        embedding: null,
-        status: "pending",
-        tokenCount: estimateTokens(txt),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    }
-
-    console.log(`  -> inserted document ${docId} with ${chunks.length} chunks`);
-  }
-}
-
-async function main() {
-  const dataDir = path.resolve(process.cwd(), "scripts/ingest/data");
-  if (!fs.existsSync(dataDir)) {
-    console.error("Data directory not found:", dataDir);
-    process.exit(1);
-  }
-
-  const files = listJsonFiles(dataDir);
-  if (files.length === 0) {
-    console.log("No JSON files found in data directory.");
-    return;
-  }
-
-  for (const f of files) {
     try {
-      await ingestFile(f);
-    } catch (e) {
-      console.error(`Failed to ingest ${f}:`, e);
+      // Generate embeddings for entire batch in one API call
+      const contents = toProcess.map(item => item.content);
+      const embeddings = await generateEmbeddings(contents);
+      
+      // MANUALLY CHANGE CAMPUS WHEN INGESTING
+      const campus = 'Pacific Center for Advanced Technology Training';
+
+      // Prepare data for insertion
+      const embeddingData: any[] = [];
+      let invalidEmbeddings = 0;
+      for (let idx = 0; idx < toProcess.length; idx++) {
+        const item = toProcess[idx];
+        const vec = embeddings[idx];
+        if (!Array.isArray(vec) || vec.length !== 1536) {
+          console.warn(`Skipping ${item.courseCode}: embedding has invalid dimensions (${vec?.length ?? 'null'})`);
+          invalidEmbeddings++;
+          continue;
+        }
+
+        embeddingData.push({
+          sourceId,
+          refId: item.courseCode,
+          title: item.course.course_title,
+          campus: campus,
+          courseCode: item.courseCode,
+          content: item.content,
+          metadata: item.course as any,
+          contentHash: item.contentHash,
+          embedding: vec,
+        });
+      }
+
+      // Insert batch into database (if any valid embeddings)
+      if (embeddingData.length > 0) {
+        await db.insert(embedding).values(embeddingData);
+      }
+
+      totalProcessed += embeddingData.length;
+      totalSkipped += invalidEmbeddings;
+      console.log(
+        `Batch ${Math.floor(i / batchSize) + 1}: Processed ${embeddingData.length} courses` +
+        (skipped > 0 ? `, skipped ${skipped} existing` : '') +
+        (invalidEmbeddings > 0 ? `, skipped ${invalidEmbeddings} invalid embeddings` : '')
+      );
+
+    } catch (error) {
+      console.error(`Error processing batch starting at index ${i}:`, error);
+      throw error;
+    }
+
+    // Delay between batches to respect rate limits
+    if (i + batchSize < courses.length) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
-  console.log("Ingestion complete.");
+  return { processed: totalProcessed, skipped: totalSkipped };
 }
 
-main().catch((err) => {
-  console.error(err);
+/**
+ * Main ingestion function with idempotency
+ */
+async function ingestCourseData(
+  jsonFilePath: string,
+  options: { skipExisting?: boolean; batchSize?: number } = {}
+): Promise<void> {
+  const { skipExisting = true, batchSize = 20 } = options;
+
+  console.log(`Starting ingestion from: ${jsonFilePath}`);
+  console.log(`Skip existing: ${skipExisting}, Batch size: ${batchSize}`);
+
+  try {
+    // Read JSON file
+    const fileContent = await fs.readFile(jsonFilePath, 'utf-8');
+    const courses: CourseData[] = JSON.parse(fileContent);
+
+    console.log(`Loaded ${courses.length} courses from file`);
+
+    // Create stable source ID and ensure source exists
+    const fileName = jsonFilePath.split('/').pop() || 'unknown';
+    const sourceId = generateSourceId(fileName);
+
+    // Check if source exists, create if not
+    const existingSource = await db
+      .select()
+      .from(source)
+      .where(eq(source.id, sourceId))
+      .limit(1);
+
+    if (existingSource.length === 0) {
+      await db.insert(source).values({
+        id: sourceId,
+        name: fileName,
+        url: jsonFilePath,
+        type: 'json-file',
+      });
+      console.log(`Created new source record: ${sourceId}`);
+    } else {
+      console.log(`Using existing source record: ${sourceId}`);
+    }
+
+    // Process courses in batches
+    const { processed, skipped } = await processBatch(courses, sourceId, batchSize, skipExisting);
+
+    console.log(`\nIngestion complete!`);
+    console.log(`   Total courses: ${courses.length}`);
+    console.log(`   Processed: ${processed}`);
+    console.log(`   Skipped: ${skipped}`);
+    console.log(`   Source ID: ${sourceId}`);
+
+  } catch (error) {
+    console.error('Error during ingestion:', error);
+    throw error;
+  }
+}
+
+// CLI execution
+const args = process.argv.slice(2);
+if (args.length === 0) {
+  console.error('Usage: npx tsx scripts/ingest/ingest-json.ts <path-to-json-file> [--force] [--batch-size=N]');
+  console.error('  --force: Process all courses even if they already exist');
+  console.error('  --batch-size=N: Set batch size (default: 20)');
   process.exit(1);
-});
+}
+
+const filePath = args[0];
+const skipExisting = !args.includes('--force');
+const batchSizeArg = args.find(arg => arg.startsWith('--batch-size='));
+const batchSize = batchSizeArg ? parseInt(batchSizeArg.split('=')[1]) : 20;
+
+ingestCourseData(filePath, { skipExisting, batchSize })
+  .then(() => {
+    console.log('\nAll done!');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('\nFatal error:', error);
+    process.exit(1);
+  });
