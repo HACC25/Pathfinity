@@ -1,3 +1,6 @@
+// Chat API route for the university course assistant.
+// Defines tools used by the assistant:
+// The file contains the system prompt and streaming response wiring.
 import { 
     streamText,
     UIMessage,
@@ -15,6 +18,71 @@ import { embedding as e } from '@/app/db/schema';
 import { sql } from 'drizzle-orm';
 
 const tools = {
+    getCourseByCode: tool({
+        description: "Get detailed information about a specific course by its exact course code (e.g., 'Com 2163', 'COM 2158'). Use this when user mentions a specific course code.",
+        inputSchema: z.object({
+            courseCode: z.string().describe("The exact course code (e.g., 'Com 2163')"),
+        }),
+        execute: async ({ courseCode }) => {
+            try {
+                // Normalize the course code (remove extra spaces, make uppercase)
+                const normalized = courseCode.trim().toUpperCase().replace(/\s+/g, ' ');
+                
+                const course = await db
+                    .select({
+                        course_code: e.courseCode,
+                        title: e.title,
+                        campus: e.campus,
+                        metadata: e.metadata,
+                    })
+                    .from(e)
+                    .where(sql`UPPER(${e.courseCode}) = ${normalized}`)
+                    .limit(1);
+
+                if (!course || course.length === 0) {
+                    return `Course ${courseCode} not found in the knowledge base. Please verify the course code or try searching with keywords.`;
+                }
+
+                const c = course[0];
+                const metadata = c.metadata as any;
+
+                const lines = [
+                    `Course: ${c.course_code} - ${c.title}`,
+                ];
+
+                if (c.campus) lines.push(`Campus/Department: ${c.campus}`);
+                
+                // Handle credits/units (check multiple fields)
+                const units = metadata?.num_units || metadata?.units || metadata?.credits || metadata?.credit_hours;
+                if (units !== undefined && units !== null && String(units).trim() !== '') {
+                    lines.push(`Units/Credits: ${units}`);
+                } else {
+                    lines.push(`Units/Credits: Not specified`);
+                }
+                
+                if (metadata?.course_desc) lines.push(`Description: ${metadata.course_desc}`);
+                if (metadata?.metadata && String(metadata.metadata).trim()) {
+                    lines.push(`Additional Info: ${metadata.metadata}`);
+                }
+                
+                // Check for various prerequisite field names
+                const prereqs = metadata?.prerequisites || metadata?.required_prep || metadata?.required_prereq;
+                if (prereqs) lines.push(`Prerequisites: ${prereqs}`);
+
+                // Add other metadata fields if available
+                if (metadata?.dept_name) lines.push(`Department Name: ${metadata.dept_name}`);
+                if (metadata?.inst_ipeds) lines.push(`Institution IPEDS: ${metadata.inst_ipeds}`);
+                if (metadata?.course_prefix) lines.push(`Course Prefix: ${metadata.course_prefix}`);
+                if (metadata?.course_number) lines.push(`Course Number: ${metadata.course_number}`);
+
+                return lines.join('\n\n');
+            } catch (error) {
+                console.error('Get course error:', error);
+                return 'Error retrieving course information. Please try again.';
+            }
+        }
+    }),
+    
     listCourses: tool({
         description: "List courses from the knowledge base. Use when user wants to see all courses, browse courses, or list courses from a specific department/campus.",
         inputSchema: z.object({
@@ -33,19 +101,21 @@ const tools = {
                     conditions.push(sql`${e.campus} ILIKE ${`%${campus}%`}`);
                 }
 
-                const baseSelect = db.select({
-                    course_code: e.courseCode,
-                    title: e.title,
-                    campus: e.campus,
-                    metadata: e.metadata,
-                }).from(e);
+                const baseSelect = db
+                    .select({
+                        course_code: e.courseCode,
+                        title: e.title,
+                        campus: e.campus,
+                        metadata: e.metadata,
+                    })
+                    .from(e);
 
-                // If conditions exist, apply them, otherwise run the base select
-                const whereClause = conditions.length > 0 ? sql.join(conditions, sql` AND `) : undefined;
+                // Apply WHERE conditions if present, then apply limit/orderBy on the final query.
+                const finalQuery = (conditions.length > 0)
+                    ? baseSelect.where(sql`${sql.join(conditions, sql` AND `)}`).limit(limit).orderBy(e.courseCode)
+                    : baseSelect.limit(limit).orderBy(e.courseCode);
 
-                const courses = whereClause
-                    ? await baseSelect.where(whereClause).limit(limit).orderBy(e.courseCode)
-                    : await baseSelect.limit(limit).orderBy(e.courseCode);
+                const courses = await finalQuery;
 
                 if (!courses || courses.length === 0) {
                     return 'No courses found matching those criteria.';
@@ -58,7 +128,12 @@ const tools = {
                     ];
                     
                     if (course.campus) lines.push(`   Campus/Department: ${course.campus}`);
-                    if (metadata?.num_units) lines.push(`   Units: ${metadata.num_units}`);
+                    
+                    // Handle credits/units with fallback
+                    const units = metadata?.num_units || metadata?.units || metadata?.credits;
+                    if (units !== undefined && units !== null && String(units).trim() !== '') {
+                        lines.push(`   Units: ${units}`);
+                    }
                     
                     if (metadata?.course_desc) {
                         const desc = String(metadata.course_desc);
@@ -76,7 +151,7 @@ const tools = {
             }
         }
     }),
-
+    
     searchKnowledgeBase: tool({
         description: "Search the course knowledge base for specific courses or topics. Use when user asks about specific course codes, prerequisites, topics, or detailed course information.",
         inputSchema: z.object({
@@ -191,7 +266,7 @@ export type ChatTools = InferUITools<typeof tools>;
 export type ChatMessage = UIMessage<never, UIDataTypes, ChatTools>;
 
 export async function POST(req: Request) {
-    try{
+    try {
         const { messages }: { messages: ChatMessage[] } = await req.json();
 
         const result = streamText({
@@ -206,21 +281,38 @@ For greetings and casual conversation:
 - Respond naturally and briefly, then offer to help with courses
 - Example: "Hello! I'm doing well, thank you. I'm here to help you find course information. What courses are you interested in?"
 
+For specific course code lookups:
+- Use getCourseByCode when user mentions a specific course code (e.g., "Com 2163", "tell me about COM 2158")
+- This guarantees finding the course if it exists and returns ALL metadata fields
+- Use for questions about specific fields: credits, IPEDS, department name, course prefix/number
+- Example: "Com 2163", "what is COM 2158", "credits for Com 2187", "what is the IPEDS for Com 2036"
+
 For listing/browsing courses:
 - Use listCourses tool for requests like "list all courses", "show me courses", "what courses are available"
 - Can filter by department or campus if user specifies
 - Present results in a clear, organized way
 - If many results, suggest being more specific
+- IMPORTANT: Only call this tool ONCE per response - do not repeat calls
 
 For specific course searches:
-- Use searchKnowledgeBase for specific course codes, topics, or detailed questions
-- Examples: "Com 2158", "AWS courses", "courses about networking", "prerequisites for X"
+- Use searchKnowledgeBase for topic-based searches, not exact course codes
+- Examples: "AWS courses", "courses about networking", "cybersecurity training"
 - Always cite results with [1], [2], etc.
 
 For course-related questions:
-- Choose the appropriate tool (listCourses for browsing, searchKnowledgeBase for specific queries)
-- If results found: Answer concisely with citations [1], [2], etc.
+- Choose the appropriate tool based on the question type
+- getCourseByCode: When user asks about a specific course code or its attributes
+- listCourses: When user wants to browse or see multiple courses
+- searchKnowledgeBase: When user searches by topic/keyword
+- If results found: Answer concisely with citations when appropriate
 - If no results: Explain you couldn't find that specific information and suggest alternatives
+
+IMPORTANT RULES:
+- When asked about credits/units for a course, use getCourseByCode to get complete info
+- If credits are "Not specified", clearly state that
+- For metadata fields (IPEDS, dept_name, etc.), use getCourseByCode
+- Never call the same tool twice in one response
+- Be conversational and helpful, not robotic
 
 For non-course questions (sports, weather, celebrities, general facts):
 - Politely decline and redirect to course information
@@ -228,10 +320,13 @@ For non-course questions (sports, weather, celebrities, general facts):
 
 RULES:
 - Always use tools for course-related questions
+- Choose the RIGHT tool: getCourseByCode for specific codes, listCourses for browsing, searchKnowledgeBase for topics
+- NEVER call the same tool multiple times in one response
 - Be conversational and helpful, not robotic
 - Cite sources with [1], [2] when providing course information from searchKnowledgeBase
 - Keep responses concise (2-5 sentences typically)
-- Guide users toward more specific queries if their question is too broad`,
+- Guide users toward more specific queries if their question is too broad
+- When credits/units are not available, clearly state "Not specified" rather than saying you can't find the info`,
             stopWhen: stepCountIs(2),
         });
 

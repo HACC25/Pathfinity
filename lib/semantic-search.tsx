@@ -1,3 +1,7 @@
+// lib/semantic-search.tsx
+// Compute an embedding for the user query and perform a cosine-similarity
+// lookup against the `embeddings` table using Drizzle ORM. Returns the top-N
+// similar records (with similarity score and selected metadata) for RAG.
 import { cosineDistance, desc, gt, sql } from 'drizzle-orm';
 import { db } from '@/app/db/index';
 import { embedding as e, source as s } from '@/app/db/schema';

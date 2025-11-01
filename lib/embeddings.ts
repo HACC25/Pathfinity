@@ -1,3 +1,7 @@
+// Lightweight wrapper helpers for generating embeddings via OpenAI.
+// - `generateEmbedding` creates a single embedding for a text string.
+// - `generateEmbeddings` batches multiple inputs for faster ingestion.
+// These helpers centralize model selection and minor input normalization.
 import { embed, embedMany } from 'ai';
 import { openai } from '@ai-sdk/openai'
 
